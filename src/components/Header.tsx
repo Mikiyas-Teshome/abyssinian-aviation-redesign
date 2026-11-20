@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { ACTS } from '@/animation/stage';
 import { contactById } from '@/content/site';
-import { QualityToggle } from './QualityToggle';
 
 export function Wordmark() {
   return (
@@ -133,7 +132,6 @@ export function Header() {
         </nav>
         <div className="menu__foot">
           <a href={phone.href}>Call {phone.value}</a>
-          <QualityToggle />
         </div>
       </div>
     </header>

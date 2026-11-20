@@ -6,7 +6,6 @@ import { EnquiryPanel } from '@/components/EnquiryPanel';
 import { Header, Hud, Wordmark } from '@/components/Header';
 import { Pathway } from '@/components/Pathway';
 import { Preloader } from '@/components/Preloader';
-import { QualityToggle } from '@/components/QualityToggle';
 import { contact, contactById, destinations, programmes, services } from '@/content/site';
 import { Experience } from '@/experience/Experience';
 
@@ -196,7 +195,6 @@ export default function Home() {
             <Wordmark />
             <p className="fine">Abyssinian Flight Services and Abyssinian Aviation Academy. {destinations.length - 1} listed destinations.</p>
             <p className="fine"><strong>In a medical emergency</strong>, contact local emergency services first. This website is not monitored in real time; for urgent air ambulance requests, call {emergency.value}.</p>
-            <QualityToggle />
           </div>
           <nav aria-label="Footer">
             <h2>Explore</h2>
