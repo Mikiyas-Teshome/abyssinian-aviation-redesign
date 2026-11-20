@@ -99,10 +99,9 @@ export function Destinations() {
       {/* pointer targets on the chart's pins; the list above is the keyboard route */}
       <div className="pins" aria-hidden="true">
         {routes.map((r) => (
-          <button
+          <div
             key={r.id}
-            type="button"
-            tabIndex={-1}
+            role="presentation"
             className="pin"
             data-anchor={`dest:${r.id}`}
             data-anchor-origin="center"
@@ -112,7 +111,7 @@ export function Destinations() {
             onMouseLeave={() => setHover(null)}
           >
             <span>{r.km.toLocaleString('en')} km</span>
-          </button>
+          </div>
         ))}
       </div>
     </>

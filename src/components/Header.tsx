@@ -29,30 +29,69 @@ function snapToAnchor(hash: string) {
   const id = hash.replace(/^#/, '');
   const target = id === 'top' ? document.body : document.getElementById(id);
   if (!target) return;
-  window.scrollTo({ top: (target as HTMLElement).offsetTop ?? 0, behavior: 'instant' });
+  const top = target === document.body ? 0 : target.getBoundingClientRect().top + window.scrollY;
+  window.scrollTo({ top, behavior: 'instant' });
   (window as unknown as { __engine?: { snap(): void } }).__engine?.snap();
+  if (target instanceof HTMLElement && id !== 'top') {
+    if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
+    target.focus({ preventScroll: true });
+  }
 }
 
 export function Header() {
   const [open, setOpen] = useState(false);
   const phone = contactById('phone-main');
 
-  // Intercept every in-page hash link so navigation jumps instantly.
+  // Intercept every in-page hash link so navigation jumps instantly and updates history.
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
       const a = (e.target as Element).closest('a[href^="#"]') as HTMLAnchorElement | null;
       if (!a || !a.hash) return;
       e.preventDefault();
       setOpen(false);
+      if (window.location.hash !== a.hash) {
+        history.pushState(null, '', a.hash);
+      }
       snapToAnchor(a.hash);
     };
+    const onPopState = () => {
+      if (window.location.hash) {
+        snapToAnchor(window.location.hash);
+      }
+    };
     document.addEventListener('click', onClick);
-    return () => document.removeEventListener('click', onClick);
+    window.addEventListener('popstate', onPopState);
+    return () => {
+      document.removeEventListener('click', onClick);
+      window.removeEventListener('popstate', onPopState);
+    };
   }, []);
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        return;
+      }
+      if (e.key === 'Tab') {
+        const header = document.querySelector('.bar');
+        if (!header) return;
+        const focusable = header.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        );
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
     window.addEventListener('keydown', onKey);
     document.documentElement.classList.add('menu-open');
     return () => {
@@ -79,7 +118,7 @@ export function Header() {
         <span>{open ? 'Close' : 'Menu'}</span>
       </button>
 
-      <div id="menu" className="menu" hidden={!open}>
+      <div id="menu" className="menu" role="dialog" aria-modal="true" aria-label="Navigation menu" hidden={!open}>
         <nav aria-label="Chapters">
           <ol>
             {ACTS.map((a, i) => (

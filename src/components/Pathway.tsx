@@ -57,7 +57,7 @@ export function Pathway() {
               <div><dt>Entry requirements</dt><dd>{p.entryRequirements?.en ?? PENDING}</dd></div>
               <div><dt>Next intake</dt><dd>{p.nextIntake?.en ?? PENDING}</dd></div>
             </dl>
-            <a className="btn btn--gold" href="#enquire" data-enquiry="academy" data-programme={p.id} tabIndex={immersive && i !== step ? -1 : undefined}>
+            <a className="btn btn--gold" href="#apply" data-enquiry="academy" data-programme={p.id} tabIndex={immersive && i !== step ? -1 : undefined}>
               Enquire about {p.code}
             </a>
           </article>

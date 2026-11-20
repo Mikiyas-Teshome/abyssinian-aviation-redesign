@@ -23,7 +23,7 @@ const base = {
 const count = (label: string) =>
   text(6)
     .min(1, `${label} is required`)
-    .regex(/^\d+$/, 'Enter a whole number');
+    .regex(/^[1-9]\d*$/, 'Enter a whole number greater than 0');
 
 export const enquirySchemas = {
   charter: z.object({

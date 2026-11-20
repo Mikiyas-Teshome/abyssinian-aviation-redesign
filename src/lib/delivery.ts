@@ -15,10 +15,10 @@ export async function deliverEnquiry(reference: string, enquiry: Enquiry): Promi
   const { company: _honeypot, ...payload } = enquiry;
 
   if (!url) {
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_MOCK_DELIVERY !== 'true' && process.env.MOCK_ENQUIRIES !== 'true') {
       throw new Error('ENQUIRY_WEBHOOK_URL is not configured');
     }
-    // Development only: log routing metadata, never the message body or contact details.
+    // Development or mock mode: log routing metadata, never the message body or contact details.
     console.info('[enquiry:dev-log]', { reference, kind: enquiry.kind, receivedAt: new Date().toISOString() });
     return { delivered: false, channel: 'dev-log' };
   }
