@@ -22,24 +22,10 @@ export function Experience() {
   const wrap = useRef<HTMLDivElement>(null);
   const engine = useRef<Engine | null>(null);
 
-  // Decide the tier just after first paint. The engine's code starts
-  // downloading at the same moment, rather than after the decision.
   useEffect(() => {
     if (pref !== 'lite') void import('./world/engine');
-    const decide = () => setTier(resolveTier(pref, downgraded));
-    const w = window as Window & {
-      requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-    // On hydration the preference first reads as 'auto' and then as the stored
-    // value. The stale decision must be cancelled, or a visitor who chose Lite
-    // still gets the full engine started (and torn down) behind their back.
-    if (w.requestIdleCallback) {
-      const id = w.requestIdleCallback(decide, { timeout: 250 });
-      return () => w.cancelIdleCallback?.(id);
-    }
-    const id = setTimeout(decide, 60);
-    return () => clearTimeout(id);
+    const decided = resolveTier(pref, downgraded);
+    setTier(decided);
   }, [pref, downgraded]);
 
   const active = tier && tier !== 'C' && !failed ? tier : null;
