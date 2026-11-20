@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import { Barlow, Barlow_Condensed, IBM_Plex_Mono, Instrument_Serif } from 'next/font/google';
 import './globals.css';
 
@@ -54,18 +55,40 @@ export const viewport: Viewport = {
 // The fallback deadline sits past the cover's own (9s), so the cover always
 // gets to leave under its own power and unbind its scroll lock; this is only
 // for the case where the bundle never runs at all.
-const boot = `(function(){var d=document.documentElement;d.setAttribute('data-js','');
+const boot = `(function(){var d=document.documentElement;d.setAttribute('data-js','');d.setAttribute('data-mode','immersive');d.setAttribute('data-hold','');
 if('scrollRestoration' in history&&!location.hash)history.scrollRestoration='manual';
-var seen=false;try{var n=performance.getEntriesByType('navigation')[0];seen=!!(n&&n.type!=='navigate')}catch(e){}
-if(seen)d.setAttribute('data-seen','');d.setAttribute('data-hold','');
+var isFresh=false;
+try{
+  if(sessionStorage.getItem('abyssinian:fresh')==='1'){
+    sessionStorage.removeItem('abyssinian:fresh');
+    sessionStorage.removeItem('abyssinian:place');
+    isFresh=true;
+  }
+}catch(e){}
+var seen=false;
+if(!isFresh){
+  try{
+    var n=performance.getEntriesByType('navigation')[0];
+    var isReload=!!(n&&n.type!=='navigate');
+    var saved=null;
+    try{saved=JSON.parse(sessionStorage.getItem('abyssinian:place')||'null')}catch(e){}
+    seen=isReload&&!!(saved&&saved.y>100);
+  }catch(e){}
+}
+if(seen)d.setAttribute('data-seen','');
+window.addEventListener('keydown',function(e){
+  if(((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==='R'||e.key==='r'))||((e.ctrlKey||e.shiftKey)&&(e.key==='F5'||e.keyCode===116))){
+    try{sessionStorage.removeItem('abyssinian:place');sessionStorage.setItem('abyssinian:fresh','1')}catch(err){}
+  }
+},true);
 setTimeout(function(){if(!d.hasAttribute('data-entered'))d.setAttribute('data-boot-timeout','');
 d.setAttribute('data-entered','');d.removeAttribute('data-hold')},12000)})()`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" dir="ltr" className={`${body.variable} ${display.variable} ${mono.variable} ${serif.variable}`} suppressHydrationWarning>
+    <html lang="en" dir="ltr" data-mode="immersive" data-js className={`${body.variable} ${display.variable} ${mono.variable} ${serif.variable}`} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: boot }} />
+        <Script id="boot" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: boot }} />
       </head>
       <body>{children}</body>
     </html>

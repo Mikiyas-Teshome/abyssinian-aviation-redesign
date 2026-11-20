@@ -93,17 +93,17 @@ export function resolveTier(pref: QualityPreference, downgraded: boolean): Tier 
   return detected === 'A' && downgraded ? 'B' : detected;
 }
 
-/** The tier that is actually running, once decided. Null until then. */
-let runtimeTier: Tier | null = null;
+/** The tier that is actually running. Defaults to 'A' (Full 3D) so the 3D immersive world is active from frame 0. */
+let runtimeTier: Tier = 'A';
 export function setRuntimeTier(t: Tier) {
   if (runtimeTier === t) return;
   runtimeTier = t;
   listeners.forEach((l) => l());
 }
-export function useRuntimeTier(): Tier | null {
+export function useRuntimeTier(): Tier {
   return useSyncExternalStore(
     subscribe,
     () => runtimeTier,
-    () => null,
+    () => 'A',
   );
 }

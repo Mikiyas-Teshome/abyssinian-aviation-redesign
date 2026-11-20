@@ -3,19 +3,9 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { onProgress } from './stage';
 
-const subscribe = (cb: () => void) => {
-  const mo = new MutationObserver(cb);
-  mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-mode'] });
-  return () => mo.disconnect();
-};
-
-/** True while acts are pinned and scrubbed by scroll. */
+/** True while acts are pinned and scrubbed by scroll (always true in 3D experience). */
 export function useImmersive(): boolean {
-  return useSyncExternalStore(
-    subscribe,
-    () => document.documentElement.dataset.mode === 'immersive',
-    () => false,
-  );
+  return true;
 }
 
 /** An act's raw scroll progress, 0 at its top and 1 at its bottom. */

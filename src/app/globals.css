@@ -129,7 +129,7 @@ p a { color: var(--gold-hi); }
 
 /* ───────────── The world ───────────── */
 .world { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; background: var(--night); }
-.world__canvas { position: absolute; inset: 0; opacity: 0; transition: opacity 1.4s ease; }
+.world__canvas { position: absolute; inset: 0; opacity: 0; transition: opacity 0.3s ease; }
 .world__canvas.is-ready { opacity: 1; }
 .world__canvas canvas { display: block; width: 100%; height: 100%; }
 /* painted sky: shown before WebGL is ready, and instead of it when unavailable */
@@ -156,10 +156,10 @@ html[data-act='enquire'] .world__sky { --sky-a: #02050c; --sky-b: #2c1711; }
 
 main, .foot { position: relative; z-index: 1; }
 
-/* ───────────── Acts and stages ───────────── */
-.act { position: relative; min-height: 92svh; }
-.stage { position: relative; padding: calc(var(--bar-h) + 2svh) var(--gutter) calc(var(--hud-h) + 1.5svh); }
-.stage__inner { position: relative; display: grid; gap: 2rem; min-height: 70svh; }
+/* ───────────── Acts and stages (3D immersive) ───────────── */
+.act { position: relative; height: calc(var(--len, 2) * 100svh); min-height: 0; }
+.stage { position: sticky; top: 0; height: 100svh; overflow: hidden; padding: calc(var(--bar-h) + 2svh) var(--gutter) calc(var(--hud-h) + 1.5svh); }
+.stage__inner { position: relative; display: grid; gap: 2rem; height: 100%; min-height: 0; }
 .copy { display: grid; gap: clamp(0.55rem, 1.9svh, 1.15rem); align-content: start; justify-items: start; max-width: 36rem; z-index: 1; transform: scale(var(--fit, 1)); transform-origin: top left; }
 /* copy sits high, in the open sky of each shot; the subject is framed below and beside it */
 .copy--l { align-self: start; justify-self: start; padding-top: clamp(0.25rem, 3svh, 3rem); }
@@ -170,15 +170,11 @@ main, .foot { position: relative; z-index: 1; }
 .copy, .way, .enquire__head, .journeys__title { text-shadow: 0 1px 2px rgba(2, 6, 14, 0.7), 0 2px 20px rgba(2, 6, 14, 0.5); }
 .copy .btn, .way .btn { text-shadow: none; }
 
-/* Immersive: tall acts, pinned stages, scroll is time */
-html[data-mode='immersive'] .act { height: calc(var(--len) * 100svh); min-height: 0; }
-html[data-mode='immersive'] .stage { position: sticky; top: 0; height: 100svh; overflow: hidden; }
-html[data-mode='immersive'] .stage__inner { height: 100%; min-height: 0; }
 /* the row is the stage's height, so an over-tall block overflows away from its anchor edge and the fit scale brings it back in */
-html[data-mode='immersive'] .stage__inner:has(> .copy) { grid-template-rows: minmax(0, 1fr); }
-html[data-mode='immersive'] .act:not(.is-live) .stage { pointer-events: none; }
-html[data-mode='immersive'] .act--enquire { height: auto; padding-top: 62svh; }
-html[data-mode='immersive'] .act--enquire .stage { position: relative; height: auto; overflow: visible; }
+.stage__inner:has(> .copy) { grid-template-rows: minmax(0, 1fr); }
+.act:not(.is-live) .stage { pointer-events: none; }
+.act--enquire { height: auto; padding-top: 62svh; }
+.act--enquire .stage { position: relative; height: auto; overflow: visible; }
 
 /* ───────────── 01 Hero ───────────── */
 .hero { max-width: none; width: 100%; gap: clamp(0.8rem, 2vh, 1.6rem); }
@@ -203,13 +199,13 @@ html[data-js]:not([data-entered]) :is(.hero .ln > span, .hero__tag, .hero__foot)
 .journeys__title { grid-column: 1 / -1; justify-content: center; align-self: start; }
 .way { display: grid; gap: 0.8rem; justify-items: start; max-width: 22rem; }
 .way--train { justify-self: end; }
-html[data-mode='immersive'][data-anchors='on'] .act--journeys .stage__inner { display: block; }
-html[data-mode='immersive'][data-anchors='on'] .journeys__title { position: absolute; top: 0; left: 0; right: 0; }
-html[data-mode='immersive'][data-anchors='on'] .way {
+html[data-anchors='on'] .act--journeys .stage__inner { display: block; }
+html[data-anchors='on'] .journeys__title { position: absolute; top: 0; left: 0; right: 0; }
+html[data-anchors='on'] .way {
   position: absolute; left: 0; top: 0; width: 21rem; translate: -50% -100%; justify-items: center; text-align: center;
 }
-html[data-mode='immersive'][data-anchors='on'] .way .tag { justify-content: center; }
-html[data-mode='immersive'][data-anchors='on'] .way::after { content: ''; width: 1px; height: 30px; background: var(--ink-2); margin-top: 0.2rem; }
+html[data-anchors='on'] .way .tag { justify-content: center; }
+html[data-anchors='on'] .way::after { content: ''; width: 1px; height: 30px; background: var(--ink-2); margin-top: 0.2rem; }
 
 /* ───────────── 06 Destinations ───────────── */
 .dest { max-width: 31rem; gap: 0.8rem; }
@@ -235,7 +231,7 @@ html[data-mode='immersive'][data-anchors='on'] .way::after { content: ''; width:
 .dest__detail strong { color: var(--ink); font-weight: 600; }
 
 .pins, .marks { display: none; }
-html[data-mode='immersive'][data-anchors='on'] :is(.pins, .marks) { display: block; position: absolute; inset: 0; pointer-events: none; }
+html[data-anchors='on'] :is(.pins, .marks) { display: block; position: absolute; inset: 0; pointer-events: none; }
 [data-anchor][data-off] { visibility: hidden; }
 .pin {
   position: absolute; left: 0; top: 0; translate: -50% -50%; width: 46px; height: 46px; padding: 0; border: 0; border-radius: 50%;
@@ -275,8 +271,6 @@ html[data-mode='immersive'][data-anchors='on'] :is(.pins, .marks) { display: blo
 .facts div:last-child { border-bottom: 1px solid var(--line); }
 .facts dt { font: 600 0.72rem/1.6 var(--f-label); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-2); }
 .facts dd { color: var(--ink); font-weight: 500; }
-html:not([data-mode='immersive']) .path__panels { gap: 3rem; }
-html:not([data-mode='immersive']) .path__panel { grid-area: auto; }
 
 /* ───────────── 08 Campus · 09 Walk-round ───────────── */
 .steps { width: 100%; max-width: 30rem; display: grid; }
@@ -481,15 +475,10 @@ html[data-hold] { overflow: hidden; }
   font: 500 0.64rem/1 var(--f-label); letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-3);
 }
 .preflight__pct { font-family: var(--f-figure); letter-spacing: 0.02em; color: var(--ink-2); }
-.preflight button {
-  position: absolute; left: 50%; bottom: max(1.5rem, 6svh); translate: -50% 0; pointer-events: auto; min-height: 44px; padding: 0 1.1rem;
-  border: 0; background: none; cursor: pointer; font: 500 0.68rem/1 var(--f-label); letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-3);
-  animation: fade 0.9s var(--ease) 0.95s both; transition: color 0.3s;
-}
-.preflight button:hover { color: var(--ink); }
+html[data-seen] .preflight__pct { display: none; }
+html[data-seen] .preflight__status { justify-content: center; }
 /* leaving: the instruments settle and fade, then the curtain lifts off the top */
 .preflight[data-phase='leaving'] .preflight__inner { animation: settle 0.9s var(--ease) forwards; }
-.preflight[data-phase='leaving'] button { opacity: 0; transition: opacity 0.4s; }
 /* transform, not clip-path: the compositor can lift the curtain without the main
    thread, which is still busy finishing the world */
 .preflight[data-phase='leaving'] { will-change: transform; animation: preflight-lift 1.5s cubic-bezier(0.72, 0, 0.16, 1) 0.35s forwards; }
@@ -581,7 +570,7 @@ html[data-hold] { overflow: hidden; }
 /* ───────────── Reduced motion: a still for every act, cuts between them ───────────── */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .hero .ln > span, .hero__tag, .hero__foot, .preflight__word span, .preflight__mark, .preflight__logo, .preflight__progress, .preflight__status, .preflight button { animation: none; }
+  .hero .ln > span, .hero__tag, .hero__foot, .preflight__word span, .preflight__mark, .preflight__logo, .preflight__progress, .preflight__status { animation: none; }
   .preflight__mark, .preflight__logo { opacity: 1; transform: none; }
   .preflight[data-phase='leaving'] { animation: fade-out 0.3s ease forwards; }
   .preflight[data-phase='leaving'] .preflight__inner { animation: none; }
@@ -600,8 +589,6 @@ html[data-act='enquire'] .bar { background: linear-gradient(180deg, rgba(5, 9, 1
 html[data-act='enquire'] .hud { background: linear-gradient(0deg, rgba(5, 9, 15, 0.94) 60%, transparent); }
 .bar, .hud { transition: background 0.5s; }
 
-/* the flat document scrolls under the bar, so the bar gets a floor there too */
-html:not([data-mode='immersive']) .bar { background: linear-gradient(180deg, rgba(4, 7, 12, 0.94) 62%, transparent); }
 .pin::before { border-width: 1px; }
 
 @media (max-width: 520px) {
@@ -634,7 +621,7 @@ html:not([data-mode='immersive']) .bar { background: linear-gradient(180deg, rgb
   .dest__km { font-size: 0.7rem; }
 }
 /* until the engine has placed it, a pinned label stays out of sight rather than at the corner */
-html[data-mode='immersive'][data-anchors='on'] [data-anchor]:not([style*='translate3d']) { visibility: hidden; }
+html[data-anchors='on'] [data-anchor]:not([style*='translate3d']) { visibility: hidden; }
 
 /* On a phone the call is the fastest route, so it is a target, not a word in a sentence. */
 .enquire__call { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem 1.2rem; }

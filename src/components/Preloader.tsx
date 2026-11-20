@@ -6,7 +6,7 @@ import { prefersReducedMotion } from '@/animation/motion-policy';
 import { reapplyRestore } from '@/animation/ScrollRig';
 
 /** A first visit plays the sequence out, so it reads as finished rather than cut. */
-const MIN_FIRST_MS = 2400;
+const MIN_FIRST_MS = 1800;
 /** Nothing to build (Lite, or no WebGL): the lettering finishes and the curtain goes. */
 const MIN_EMPTY_MS = 1500;
 /** Nobody waits longer than this; the world then fades in when it is ready. */
@@ -88,6 +88,7 @@ export function Preloader() {
       window.removeEventListener('keydown', keys);
     };
     if (prefersReducedMotion()) minimum.current = 0;
+    else if (resume.current) minimum.current = 1200;
     return () => unlock.current();
   }, []);
 
@@ -142,7 +143,6 @@ export function Preloader() {
           <span className="preflight__pct">{String(Math.round(shown * 100)).padStart(3, ' ')}</span>
         </p>
       </div>
-      <button type="button" onClick={leave}>Skip intro</button>
     </div>
   );
 }
