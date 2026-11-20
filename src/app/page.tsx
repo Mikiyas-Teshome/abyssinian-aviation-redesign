@@ -6,7 +6,6 @@ import { EnquiryPanel } from '@/components/EnquiryPanel';
 import { Header, Hud, Wordmark } from '@/components/Header';
 import { Pathway } from '@/components/Pathway';
 import { Preloader } from '@/components/Preloader';
-import { QualityToggle } from '@/components/QualityToggle';
 import { contact, contactById, destinations, programmes, services } from '@/content/site';
 import { Experience } from '@/experience/Experience';
 
@@ -195,7 +194,7 @@ export default function Home() {
           <div>
             <Wordmark />
             <p className="fine">Abyssinian Flight Services and Abyssinian Aviation Academy. {destinations.length - 1} listed destinations.</p>
-            <QualityToggle />
+            <p className="fine"><strong>In a medical emergency</strong>, contact local emergency services first. This website is not monitored in real time; for urgent air ambulance requests, call {emergency.value}.</p>
           </div>
           <nav aria-label="Footer">
             <h2>Explore</h2>
@@ -221,11 +220,7 @@ export default function Home() {
           </div>
         </div>
         <div className="foot__legal">
-          <p>
-            <strong>In a medical emergency</strong>, contact local emergency services first. This website is not monitored in
-            real time; for urgent air ambulance requests, call {emergency.value}.
-          </p>
-          <p>© {new Date().getFullYear()} Abyssinian Flight Services. Destinations shown are not a timetable or a guarantee of availability.</p>
+          <p>© {new Date().getFullYear()} Abyssinian Flight Services. Developed by <a href="https://www.bekurtechnologies.com/" target="_blank" rel="noopener noreferrer">Bekur Technologies</a>.</p>
         </div>
       </footer>
     </>

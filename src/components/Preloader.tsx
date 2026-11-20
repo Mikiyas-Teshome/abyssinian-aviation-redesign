@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { loadPlaced, loadProgress, loadReady, subscribeLoad } from '@/animation/stage';
 import { prefersReducedMotion } from '@/animation/motion-policy';
+import { reapplyRestore } from '@/animation/ScrollRig';
 
 /** A first visit plays the sequence out, so it reads as finished rather than cut. */
 const MIN_FIRST_MS = 2400;
@@ -55,6 +56,7 @@ export function Preloader() {
   const leave = useCallback(() => {
     document.documentElement.setAttribute('data-entered', '');
     document.documentElement.removeAttribute('data-hold');
+    reapplyRestore();
     unlock.current();
     // A reload has already been put back where it was; only an arrival starts
     // at the top.

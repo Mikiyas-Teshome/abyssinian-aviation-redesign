@@ -25,9 +25,30 @@ export function Wordmark() {
   );
 }
 
+function snapToAnchor(hash: string) {
+  const id = hash.replace(/^#/, '');
+  const target = id === 'top' ? document.body : document.getElementById(id);
+  if (!target) return;
+  window.scrollTo({ top: (target as HTMLElement).offsetTop ?? 0, behavior: 'instant' });
+  (window as unknown as { __engine?: { snap(): void } }).__engine?.snap();
+}
+
 export function Header() {
   const [open, setOpen] = useState(false);
   const phone = contactById('phone-main');
+
+  // Intercept every in-page hash link so navigation jumps instantly.
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const a = (e.target as Element).closest('a[href^="#"]') as HTMLAnchorElement | null;
+      if (!a || !a.hash) return;
+      e.preventDefault();
+      setOpen(false);
+      snapToAnchor(a.hash);
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, []);
 
   useEffect(() => {
     if (!open) return;

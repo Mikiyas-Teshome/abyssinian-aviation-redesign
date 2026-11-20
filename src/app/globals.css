@@ -36,7 +36,7 @@ html {
   scrollbar-gutter: stable;
   background: var(--night);
   color-scheme: dark;
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
   -webkit-text-size-adjust: 100%;
 }
 
@@ -508,7 +508,7 @@ html[data-hold] { overflow: hidden; }
   position: absolute; left: 50%; top: 50%; translate: -50% -50%; z-index: -1;
   margin: 0; pointer-events: none; user-select: none;
   font: 400 clamp(4rem, 20.5vw, 22rem) / 0.8 var(--f-display); letter-spacing: -0.01em;
-  color: transparent; -webkit-text-stroke: 1px var(--line); white-space: nowrap;
+  color: color-mix(in srgb, var(--line) 18%, transparent); -webkit-text-stroke: 1px color-mix(in srgb, var(--line) 35%, transparent); white-space: nowrap;
 }
 .foot__grid { position: relative; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: 2.5rem; }
 .foot__grid > div:first-child { display: grid; gap: 1rem; align-content: start; justify-items: start; }

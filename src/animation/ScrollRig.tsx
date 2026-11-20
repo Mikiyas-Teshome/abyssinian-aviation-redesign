@@ -12,6 +12,20 @@ gsap.registerPlugin(ScrollTrigger, useGSAP);
 /** Where this visit had got to, kept across a reload for the length of the tab. */
 const PLACE = 'abyssinian:place';
 
+// The scroll position restore() calculated while overflow:hidden was still active.
+// overflow:hidden clamps scrollY to 0, so the scrollTo() is a no-op. We store
+// the target here and re-apply it in the Preloader's leave(), after data-hold is removed.
+let pendingRestore: number | null = null;
+
+/** Re-apply the scroll restore after the cover's overflow lock is released. */
+export function reapplyRestore() {
+  if (pendingRestore === null) return;
+  const target = pendingRestore;
+  pendingRestore = null;
+  window.scrollTo({ top: target, behavior: 'instant' });
+  (window as unknown as { __engine?: { snap(): void } }).__engine?.snap();
+}
+
 /**
  * The scroll rig. In the immersive mode each act is a tall section with a
  * pinned stage: its scroll progress becomes act time for the world, and one
@@ -50,7 +64,10 @@ export function ScrollRig() {
         // The acts were one screen tall a moment ago and are many screens tall
         // now, so any position the browser kept is meaningless. Start at the
         // top, and put the visit back where it was once the real height exists.
-        if (!window.location.hash && window.scrollY > 0) window.scrollTo({ top: 0, behavior: 'instant' });
+        // On a first visit the SSR position is stale; reset to top.
+        // On a reload keep the position: restore() will put us back precisely.
+        if (!window.location.hash && window.scrollY > 0 && !root.hasAttribute('data-seen'))
+          window.scrollTo({ top: 0, behavior: 'instant' });
         acts.forEach((el, i) => {
           const def = ACTS[i];
           const last = i === acts.length - 1;
@@ -159,11 +176,12 @@ export function ScrollRig() {
           }
           if (!saved?.y || !saved.h) return;
           const h = document.documentElement.scrollHeight;
-          const y = Math.round((saved.y * h) / saved.h);
-          // `instant`, because the page asks for smooth scrolling and a
-          // restore is not a scroll: animating there would fly the visitor
-          // through every chapter in between.
-          window.scrollTo({ top: Math.max(0, Math.min(y, h - window.innerHeight)), behavior: 'instant' });
+          const y = Math.max(0, Math.min(Math.round((saved.y * h) / saved.h), h - window.innerHeight));
+          // Store for reapplyRestore(): overflow:hidden is still active here (data-hold),
+          // so scrollTo() is a no-op. The Preloader calls reapplyRestore() right after
+          // it removes data-hold, which is when the scroll is actually free to move.
+          pendingRestore = y;
+          window.scrollTo({ top: y, behavior: 'instant' });
         };
         let saveFrame = 0;
         const save = () => {
@@ -243,9 +261,10 @@ export function ScrollRig() {
   return null;
 }
 
-/** Scroll so that an act's local progress is `p` (immersive mode). */
+/** Scroll so that an act's local progress is `p` (immersive mode), snapping the engine. */
 export function scrollToProgress(actId: string, p: number) {
   const el = document.querySelector<HTMLElement>(`.act[data-act="${actId}"]`);
   if (!el) return;
-  window.scrollTo({ top: el.offsetTop + p * el.offsetHeight, behavior: 'smooth' });
+  window.scrollTo({ top: el.offsetTop + p * el.offsetHeight, behavior: 'instant' });
+  (window as unknown as { __engine?: { snap(): void } }).__engine?.snap();
 }
