@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { destinations, hub, programmes } from '@/content/site';
 import { GEAR, type Aircraft } from './aircraft';
-import { rng, type Kit, type Painter } from './kit';
+import { grit, rng, type Kit, type Painter } from './kit';
 
 /**
  * The built world, laid out along one route:
@@ -54,8 +54,6 @@ export interface Params {
   landing: number;
   dims: number;
   routes: number;
-  /** Landing gear: 0 down … 1 retracted. */
-  gear: number;
   /** Cabin lighting seen through the windows. */
   cabin: number;
 }
@@ -75,7 +73,7 @@ function quonset(kit: Kit, R: number, H: number, L: number, doorW: number, doorH
     s.closePath();
     return s;
   };
-  put(own(new THREE.ExtrudeGeometry(arch(R, H, 0.22), { depth: L, bevelEnabled: false, curveSegments: 30 })), mats.tin, g);
+  put(own(new THREE.ExtrudeGeometry(arch(R, H, 0.22), { depth: L, bevelEnabled: false, curveSegments: 48 })), mats.corrugated, g);
   const rib = own(new THREE.ExtrudeGeometry(arch(R - 0.2, H - 0.2, 0.42), { depth: 0.34, bevelEnabled: false, curveSegments: 30 }));
   for (let z = 0.6; z < L; z += L / Math.round(L / 5.2)) put(rib, mats.tinDark, g, 0, 0, z);
   // purlins along the roof
@@ -109,10 +107,7 @@ const runwayPaint: Painter = (ctx, W, H) => {
   const u = H / 350; // px per world unit along the runway
   ctx.fillStyle = '#2b2d31';
   ctx.fillRect(0, 0, W, H);
-  for (let i = 0; i < 9000; i++) {
-    ctx.fillStyle = `rgba(${rand() > 0.5 ? '255,255,255' : '0,0,0'},${rand() * 0.05})`;
-    ctx.fillRect(rand() * W, rand() * H, 1 + rand() * 3, 2 + rand() * 14);
-  }
+  grit(ctx, W, H, 0.42, 1.4);
   // rubber where aircraft touch down
   for (const end of [0.12, 0.88]) {
     const g = ctx.createRadialGradient(W / 2, H * (1 - end), 0, W / 2, H * (1 - end), W * 2.4);
@@ -146,7 +141,51 @@ export function buildHomeField(kit: Kit, aircraft: () => Aircraft) {
   const rw = new THREE.PlaneGeometry(20, 350);
   rw.rotateX(-Math.PI / 2);
   put(own(rw), kit.std('#ffffff', 0.92, 0, { map: kit.paint(256, kit.lite ? 2048 : 4096, runwayPaint) }), group, 0, 0.04, -165, false);
-  block(64, 0.05, 44, mats.concreteDark, group, 0, 0, 30);
+  const apronTex = kit.paint(kit.lite ? 1024 : 2048, kit.lite ? 704 : 1408, (ctx, W, H) => {
+    const r2 = rng(61);
+    const SX = 64, SZ = 44, slab = 5.2;
+    const px = W / SX, pz = H / SZ;
+    ctx.fillStyle = '#6a6863';
+    ctx.fillRect(0, 0, W, H);
+    // each slab was poured on a different day
+    for (let x = 0; x < SX; x += slab) {
+      for (let z = 0; z < SZ; z += slab) {
+        const t = 92 + Math.floor(r2() * 22);
+        ctx.fillStyle = `rgb(${t},${t - 2},${t - 6})`;
+        ctx.fillRect(x * px, z * pz, slab * px, slab * pz);
+      }
+    }
+    grit(ctx, W, H, 0.5);
+    // stains: oil under parked aircraft, and broad weathering
+    const blot = (x: number, z: number, rad: number, a: number) => {
+      const g = ctx.createRadialGradient(x * px, z * pz, 0, x * px, z * pz, rad * px);
+      g.addColorStop(0, `rgba(18,16,14,${a})`);
+      g.addColorStop(1, 'rgba(18,16,14,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(x * px, z * pz, rad * px, rad * pz * (0.6 + r2() * 0.6), r2() * 3, 0, Math.PI * 2);
+      ctx.fill();
+    };
+    for (let i = 0; i < 40; i++) blot(r2() * SX, r2() * SZ, 1 + r2() * 5, 0.05 + r2() * 0.1);
+    for (const [x, z] of [[32, 30], [27, 26], [37, 33], [32, 16]]) blot(x, z, 1.2 + r2() * 1.4, 0.35);
+    // tyre scuffs where aircraft turn out of the hangar
+    ctx.strokeStyle = 'rgba(12,12,12,0.12)';
+    ctx.lineWidth = 0.45 * px;
+    for (let i = 0; i < 9; i++) {
+      const off = (r2() - 0.5) * 6;
+      ctx.beginPath();
+      ctx.moveTo((32 + off - 1.6) * px, 0);
+      ctx.bezierCurveTo((32 + off - 1.6) * px, 14 * pz, (30 + off) * px, 30 * pz, (31 + off + r2() * 6) * px, H);
+      ctx.stroke();
+    }
+    // sealed joints, darker and slightly wider than a pencil line
+    ctx.strokeStyle = 'rgba(30,28,25,0.75)';
+    ctx.lineWidth = Math.max(2, 0.06 * px);
+    for (let x = slab; x < SX; x += slab) { ctx.beginPath(); ctx.moveTo(x * px, 0); ctx.lineTo(x * px, H); ctx.stroke(); }
+    for (let z = slab; z < SZ; z += slab) { ctx.beginPath(); ctx.moveTo(0, z * pz); ctx.lineTo(W, z * pz); ctx.stroke(); }
+  });
+  const apron = kit.std('#ffffff', 0.94, 0, { map: apronTex, roughnessMap: kit.grain(6, 44 / 64) });
+  block(64, 0.05, 44, apron, group, 0, 0, 30);
   block(0.22, 0.02, 34, mats.yellow, group, 0, 0.055, 26);
   for (let z = 6; z >= -340; z -= 12) {
     [-10.6, 10.6].forEach((x) => {
@@ -179,6 +218,7 @@ export function buildHomeField(kit: Kit, aircraft: () => Aircraft) {
   inside.position.z = SITE.hangarDoorZ;
   group.add(inside);
   const parked = aircraft();
+  parked.group.userData.dynamic = true;
   parked.group.position.set(7.6, GEAR, 21.5);
   parked.group.rotation.y = 0.32;
   inside.add(parked.group);
@@ -213,6 +253,7 @@ export function buildHomeField(kit: Kit, aircraft: () => Aircraft) {
 
   // Windsock
   const sock = new THREE.Group();
+  sock.userData.dynamic = true;
   sock.position.set(15, 0, -34);
   put(cyl(0.06, 0.09, 6, 8), mats.steel, sock, 0, 3, 0);
   const sockCone = put(own(new THREE.ConeGeometry(0.42, 2.6, 12, 1, true)), kit.std('#d9672b', 0.9, 0, { side: THREE.DoubleSide }), sock, 0, 5.8, 0);
@@ -277,7 +318,7 @@ export function buildHomeField(kit: Kit, aircraft: () => Aircraft) {
   // Academy campus
   const campus = new THREE.Group();
   group.add(campus);
-  block(36, 0.05, 34, mats.concrete, campus, 46, 0, -90);
+  block(36, 0.05, 34, apron, campus, 46, 0, -90);
   // control tower
   const T = SITE.tower;
   const towerMat = kit.std('#8a8479', 0.9);
@@ -318,6 +359,7 @@ export function buildHomeField(kit: Kit, aircraft: () => Aircraft) {
   ramp.rotation.y = Math.PI / 2;
   campus.add(ramp);
   const trainer = aircraft();
+  trainer.group.userData.dynamic = true;
   trainer.group.position.copy(SITE.trainer.pos);
   trainer.group.rotation.y = SITE.trainer.yaw;
   campus.add(trainer.group);
@@ -334,6 +376,8 @@ export function buildHomeField(kit: Kit, aircraft: () => Aircraft) {
   for (let i = 0; i < 4; i++) put(cyl(0.42, 0.42, 1.15, 14), i % 2 ? mats.drum : mats.tinDark, group, -19 - rand() * 3, 0.6, 4 + i * 1.1);
 
   void lamps;
+  const merged = kit.freeze(group);
+  void merged;
   return {
     group,
     anchors,
@@ -361,10 +405,7 @@ export function buildStrip(kit: Kit) {
     const r = rng(4);
     ctx.fillStyle = '#5e4330';
     ctx.fillRect(0, 0, W, H);
-    for (let i = 0; i < 7000; i++) {
-      ctx.fillStyle = `rgba(${r() > 0.5 ? '40,24,14' : '150,120,90'},${r() * 0.1})`;
-      ctx.fillRect(r() * W, r() * H, 2 + r() * 5, 3 + r() * 22);
-    }
+    grit(ctx, W, H, 0.5, 1.6);
     ctx.fillStyle = 'rgba(60,36,22,0.28)';
     ctx.fillRect(W * 0.3, 0, 12, H);
     ctx.fillRect(W * 0.66, 0, 12, H);
@@ -378,22 +419,23 @@ export function buildStrip(kit: Kit) {
   });
   put(own(dirt), kit.std('#ffffff', 1, 0, { map: dirtTex }), group, 0, 0.05, (z0 + z1) / 2, false);
 
-  // lanterns marking the edges for a night arrival
-  const flame = kit.emissive('#ffb45e', 1);
+  // Edge markers the way bush strips mark them by day: old tyres, half
+  // buried and whitewashed, the paint long since dusty and chipped.
+  const whitewash = kit.std('#d8d2c4', 0.92, 0, { roughnessMap: kit.grain(2), normalMap: kit.bump(2, true), normalScale: new THREE.Vector2(0.9, 0.9) });
+  const tyre = own(new THREE.TorusGeometry(0.34, 0.13, 10, 20));
+  const r3 = rng(31);
   for (let z = z0; z >= z1; z -= 9) {
     [-8.2, 8.2].forEach((x) => {
-      block(0.26, 0.34, 0.26, mats.tinDark, group, x, 0, z);
-      put(sphere(0.1, 8, 6), flame, group, x, 0.42, z, false);
-      glow(x, 0.45, z, '#ffab52', 2.3, 1);
+      const t = put(tyre, whitewash, group, x + (r3() - 0.5) * 0.3, 0.06, z + (r3() - 0.5) * 0.4);
+      t.rotation.set(Math.PI / 2 + (r3() - 0.5) * 0.25, 0, r3() * Math.PI);
+      t.scale.setScalar(0.9 + r3() * 0.25);
     });
   }
-  const lanternLight = new THREE.PointLight('#ff9a4a', 0, 42, 1.5);
-  lanternLight.position.set(-4, 1.6, -1016);
-  group.add(lanternLight);
 
   // windsock, 4×4 with a beacon
   put(cyl(0.05, 0.08, 5, 8), mats.steel, group, 15, 2.5, -996);
   const sock = put(own(new THREE.ConeGeometry(0.36, 2.2, 10, 1, true)), kit.std('#d9672b', 0.9, 0, { side: THREE.DoubleSide }), group, 15, 4.8, -996);
+  sock.userData.dynamic = true;
   sock.geometry.rotateZ(Math.PI / 2);
   sock.geometry.translate(1.1, 0, 0);
   const car = new THREE.Group();
@@ -439,6 +481,7 @@ export function buildStrip(kit: Kit) {
   }
   // dimension lines round the main crate — what a cargo enquiry asks for
   const dims = new THREE.Group();
+  dims.userData.dynamic = true;
   dims.position.copy(main.position);
   dims.rotation.y = 0.5;
   const dimMat = kit.emissive('#e4c994', 1.4);
@@ -451,11 +494,10 @@ export function buildStrip(kit: Kit) {
   [-0.75, 0.75].forEach((z) => line(0.3, 0.02, 0.02, 1.3, -0.38, z));
   cargo.add(dims);
 
+  kit.freeze(group);
   return {
     group,
     update(p: Params, time: number) {
-      flame.emissiveIntensity = p.lantern * (2.2 + Math.sin(time * 9) * 0.25);
-      lanternLight.intensity = p.lantern * 26;
       carBeacon.emissiveIntensity = p.beacon * (0.5 + 0.5 * Math.sin(time * 7)) * 5;
       sock.rotation.z = -0.2 + Math.sin(time * 1.8) * 0.07;
       dims.visible = p.dims > 0.01;

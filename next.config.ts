@@ -10,6 +10,8 @@ const securityHeaders = [
 const config: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // the dev-mode badge sits on top of the HUD; testing on a phone should look like production
+  devIndicators: false,
   turbopack: { root: process.cwd() },
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];

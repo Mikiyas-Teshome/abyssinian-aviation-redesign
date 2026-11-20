@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { stage } from '@/animation/stage';
+import { reportLoad, stage } from '@/animation/stage';
 import { useReducedMotion } from '@/animation/motion-policy';
 import type { Engine } from './world/engine';
 import { resolveTier, setRuntimeTier, useAutoDowngraded, useQualityPreference, type Tier } from './quality';
@@ -22,12 +22,24 @@ export function Experience() {
   const wrap = useRef<HTMLDivElement>(null);
   const engine = useRef<Engine | null>(null);
 
-  // Decide the tier after first paint, when the browser is idle.
+  // Decide the tier just after first paint. The engine's code starts
+  // downloading at the same moment, rather than after the decision.
   useEffect(() => {
+    if (pref !== 'lite') void import('./world/engine');
     const decide = () => setTier(resolveTier(pref, downgraded));
-    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
-    if (w.requestIdleCallback) w.requestIdleCallback(decide, { timeout: 900 });
-    else setTimeout(decide, 150);
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    // On hydration the preference first reads as 'auto' and then as the stored
+    // value. The stale decision must be cancelled, or a visitor who chose Lite
+    // still gets the full engine started (and torn down) behind their back.
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(decide, { timeout: 250 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const id = setTimeout(decide, 60);
+    return () => clearTimeout(id);
   }, [pref, downgraded]);
 
   const active = tier && tier !== 'C' && !failed ? tier : null;
@@ -35,6 +47,8 @@ export function Experience() {
   useEffect(() => {
     if (!tier) return;
     const effective: Tier = active ?? 'C';
+    // without a world to build there is nothing to wait for
+    if (!active) reportLoad(1, true);
     document.documentElement.dataset.tier = effective;
     setRuntimeTier(effective);
   }, [tier, active]);
@@ -44,25 +58,51 @@ export function Experience() {
     engine.current?.invalidate();
   }, [reduced]);
 
-  // The engine is loaded only when it will be used.
+  // The engine is loaded only when it will be used, and built in stages that
+  // report their progress to the intro.
   useEffect(() => {
     if (!active || !canvas.current) return;
-    let cancelled = false;
-    import('./world/engine').then(({ createEngine }) => {
-      if (cancelled || !canvas.current) return;
-      const e = createEngine(canvas.current, { lite: active === 'B', onReady: () => setReady(true), onLost: () => setFailed(true) });
-      if (!e) return setFailed(true);
-      engine.current = e;
-      // console handle for inspecting any moment of the journey
-      (window as unknown as { __engine: Engine }).__engine = e;
-    });
+    const signal = { cancelled: false };
+    reportLoad(0.04);
+    import('./world/engine')
+      .then(async ({ createEngine, BUILD_CANCELLED }) => {
+        if (signal.cancelled || !canvas.current) return;
+        try {
+          const e = await createEngine(canvas.current, {
+            lite: active === 'B',
+            signal,
+            onProgress: (done) => reportLoad(0.06 + done * 0.9),
+            onReady: () => {
+              setReady(true);
+              reportLoad(1, true);
+            },
+            onLost: () => setFailed(true),
+          });
+          if (!e) return setFailed(true);
+          if (signal.cancelled) return e.destroy();
+          engine.current = e;
+          // console handle for inspecting any moment of the journey
+          (window as unknown as { __engine: Engine }).__engine = e;
+        } catch (err) {
+          if (err !== BUILD_CANCELLED) {
+            console.error(err);
+            setFailed(true);
+          }
+        }
+      })
+      .catch(() => setFailed(true));
     return () => {
-      cancelled = true;
+      signal.cancelled = true;
       engine.current?.destroy();
       engine.current = null;
       setReady(false);
     };
   }, [active]);
+
+  // if the world cannot be built, the intro must not wait for it
+  useEffect(() => {
+    if (failed) reportLoad(1, true);
+  }, [failed]);
 
   return (
     <div className="world" aria-hidden="true">

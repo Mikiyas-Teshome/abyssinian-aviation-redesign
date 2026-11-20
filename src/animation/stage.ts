@@ -48,3 +48,37 @@ export function onProgress(id: string, cb: Listener) {
     stage.listeners[id]?.delete(cb);
   };
 }
+
+/* ── Loading ───────────────────────────────────────────────
+   How far the world has got with building itself, so the intro can stay up
+   exactly as long as there is something worth waiting for. */
+type LoadListener = () => void;
+const load = { progress: 0, ready: false, placed: false, listeners: new Set<LoadListener>() };
+
+export function reportLoad(progress: number, ready = false) {
+  const p = Math.max(load.progress, Math.min(1, progress));
+  if (p === load.progress && ready === load.ready) return;
+  load.progress = p;
+  load.ready = load.ready || ready;
+  load.listeners.forEach((l) => l());
+}
+export function subscribeLoad(l: LoadListener) {
+  load.listeners.add(l);
+  return () => {
+    load.listeners.delete(l);
+  };
+}
+export const loadProgress = () => load.progress;
+export const loadReady = () => load.ready;
+/**
+ * The scroll rig has put the visit back where it was. A reload cannot do that
+ * until the acts have grown to full height, which is after hydration — so the
+ * cover has to stay up until this is true, or the page is painted at the top
+ * and then jumps.
+ */
+export function markPlaced() {
+  if (load.placed) return;
+  load.placed = true;
+  load.listeners.forEach((l) => l());
+}
+export const loadPlaced = () => load.placed;

@@ -18,6 +18,13 @@ export function useImmersive(): boolean {
   );
 }
 
+/** An act's raw scroll progress, 0 at its top and 1 at its bottom. */
+export function useActProgress(actId: string): number {
+  const [p, setP] = useState(0);
+  useEffect(() => onProgress(actId, setP), [actId]);
+  return p;
+}
+
 /**
  * A step index derived from an act's scroll progress. `bounds` are the
  * progress values at which each next step begins.

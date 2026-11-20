@@ -22,6 +22,9 @@ describe('content model', () => {
   it('keeps placeholder testimonials and unverified claims out of the approved set', () => {
     expect(testimonials.every((t) => t.verification.status === 'rejected')).toBe(true);
     expect(claims.find((c) => c.id === 'first-private-academy')!.verification.status).toBe('unverified-claim');
+    // a superlative or a headline figure the operator reports about itself stays unverified,
+    // however many of its own pages repeat it
+    expect(claims.find((c) => c.id === 'over-50-destinations')!.verification.status).toBe('unverified-claim');
   });
 
   it('does not invent programme facts', () => {
@@ -29,6 +32,13 @@ describe('content model', () => {
       expect(p.duration).toBeNull();
       expect(p.entryRequirements).toBeNull();
       expect(p.nextIntake).toBeNull();
+    }
+  });
+
+  it('sources every claim to a page and a date', () => {
+    for (const c of claims) {
+      expect(c.verification.source).toMatch(/\d{4}-\d{2}-\d{2}|snapshot/);
+      expect(c.verification.note ?? '').not.toBe('');
     }
   });
 

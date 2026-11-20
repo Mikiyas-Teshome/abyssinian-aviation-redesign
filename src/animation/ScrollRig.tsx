@@ -3,11 +3,14 @@
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
-import { ACTS, publishProgress, stage } from './stage';
+import { ACTS, markPlaced, publishProgress, stage } from './stage';
 import { useReducedMotion } from './motion-policy';
 import { useRuntimeTier } from '@/experience/quality';
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
+
+/** Where this visit had got to, kept across a reload for the length of the tab. */
+const PLACE = 'abyssinian:place';
 
 /**
  * The scroll rig. In the immersive mode each act is a tall section with a
@@ -44,6 +47,10 @@ export function ScrollRig() {
       };
 
       if (immersive) {
+        // The acts were one screen tall a moment ago and are many screens tall
+        // now, so any position the browser kept is meaningless. Start at the
+        // top, and put the visit back where it was once the real height exists.
+        if (!window.location.hash && window.scrollY > 0) window.scrollTo({ top: 0, behavior: 'instant' });
         acts.forEach((el, i) => {
           const def = ACTS[i];
           const last = i === acts.length - 1;
@@ -135,31 +142,100 @@ export function ScrollRig() {
         document.fonts?.ready.then(fit);
         fit();
 
+        // Reloading should not cost you your place. The browser's own
+        // restoration is turned off because it fires while the page is still
+        // one screen tall, so the position is kept here instead — together
+        // with the height it was measured against, which is the only way the
+        // number means anything once the acts have grown to full size.
+        let placed = false;
+        const restore = () => {
+          placed = true;
+          if (window.location.hash || !root.hasAttribute('data-seen')) return;
+          let saved: { y?: number; h?: number } | null = null;
+          try {
+            saved = JSON.parse(sessionStorage.getItem(PLACE) || 'null');
+          } catch {
+            saved = null;
+          }
+          if (!saved?.y || !saved.h) return;
+          const h = document.documentElement.scrollHeight;
+          const y = Math.round((saved.y * h) / saved.h);
+          // `instant`, because the page asks for smooth scrolling and a
+          // restore is not a scroll: animating there would fly the visitor
+          // through every chapter in between.
+          window.scrollTo({ top: Math.max(0, Math.min(y, h - window.innerHeight)), behavior: 'instant' });
+        };
+        let saveFrame = 0;
+        const save = () => {
+          saveFrame = 0;
+          // before the restore has run, the position on screen is not the
+          // visit's own — writing it would overwrite the place being restored
+          if (!placed) return;
+          try {
+            sessionStorage.setItem(PLACE, JSON.stringify({ y: Math.round(window.scrollY), h: document.documentElement.scrollHeight }));
+          } catch {
+            /* private windows and blocked storage simply do not keep the place */
+          }
+        };
+        const queueSave = () => {
+          saveFrame ||= requestAnimationFrame(save);
+        };
+        window.addEventListener('scroll', queueSave, { passive: true });
+        // the pins are what give the document its real height, so the place
+        // can only be worked out once they have been laid out
+        ScrollTrigger.refresh();
+        restore();
+        // the cover is waiting on this before it lifts
+        markPlaced();
+
         return () => {
           document.removeEventListener('focusin', onFocus);
           window.removeEventListener('resize', fit);
+          window.removeEventListener('scroll', queueSave);
+          cancelAnimationFrame(saveFrame);
           ro.disconnect();
           document.querySelectorAll<HTMLElement>('.copy, .stage__inner').forEach((c) => c.style.removeProperty('--fit'));
         };
       }
 
-      // Flat document: every act is live; the world shows one still per act.
-      acts.forEach((el, i) => {
-        el.classList.add('is-live');
-        ScrollTrigger.create({
-          trigger: el,
-          start: 'top 55%',
-          end: 'bottom 55%',
-          onToggle: (self) => {
-            if (!self.isActive) return;
-            setActive(i);
-            // each act's settled view (a moment inside its first camera hold)
-            stage.u = i + (i === 0 ? 0.3 : 0.05);
-            document.querySelector('.world__canvas')?.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 320, easing: 'ease-out' });
-          },
+      // Flat document: every act is live, and the world shows one still per act.
+      // The act is whichever one is nearest the middle of the screen, measured
+      // on the spot. The acts are only a screen tall here, so a trigger window
+      // narrow enough to tell them apart is too narrow to be dependable.
+      acts.forEach((el) => el.classList.add('is-live'));
+      markPlaced();
+      let frame = 0;
+      const pick = () => {
+        frame = 0;
+        const middle = window.scrollY + window.innerHeight / 2;
+        let best = 0;
+        let nearest = Infinity;
+        acts.forEach((el, i) => {
+          const r = el.getBoundingClientRect();
+          const distance = Math.abs(r.top + window.scrollY + r.height / 2 - middle);
+          if (distance < nearest) {
+            nearest = distance;
+            best = i;
+          }
         });
-      });
-      return () => acts.forEach((el) => el.classList.remove('is-live'));
+        if (best === current) return;
+        setActive(best);
+        // each act's settled view: a moment inside its first camera hold
+        stage.u = best + (best === 0 ? 0.3 : 0.05);
+        document.querySelector('.world__canvas')?.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 320, easing: 'ease-out' });
+      };
+      const queue = () => {
+        frame ||= requestAnimationFrame(pick);
+      };
+      window.addEventListener('scroll', queue, { passive: true });
+      window.addEventListener('resize', queue);
+      pick();
+      return () => {
+        window.removeEventListener('scroll', queue);
+        window.removeEventListener('resize', queue);
+        cancelAnimationFrame(frame);
+        acts.forEach((el) => el.classList.remove('is-live'));
+      };
     },
     { dependencies: [immersive], revertOnUpdate: true },
   );

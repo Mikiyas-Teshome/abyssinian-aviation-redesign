@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GEAR } from './aircraft';
 import { SITE } from './sets';
+import { groundHeight } from './terrain';
 
 type V3 = [number, number, number];
 const v = (a: V3) => new THREE.Vector3(...a);
@@ -140,7 +141,15 @@ export function flightPose(t: number, out: Pose): Pose {
    Every chapter is a stop: the camera arrives, drifts while the copy is up,
    and moves on.             */
 
-type Stop = [t: number, pos: V3, look: V3, sx: number, pb?: number];
+type Stop = [t: number, pos: V3, look: V3, sx: number, pb?: number, lift?: number];
+
+/**
+ * How far up the frame a portrait shot pushes its subject, as a fraction of
+ * the screen, to leave the lower part for the copy. Most shots can take this
+ * from their pull-back; a shot that cannot be pulled back — the hero, with a
+ * hangar wall behind the camera — sets its own.
+ */
+const liftFor = (pb: number, lift?: number) => lift ?? 0.2 * Math.min(1, Math.max(0.25, (pb - 0.9) / 0.35));
 const P = new THREE.Vector3();
 const pose: Pose = { visible: true, position: new THREE.Vector3(), yaw: 0, pitch: 0, roll: 0, air: 0 };
 /** A stop defined relative to where the aircraft is at that moment. */
@@ -156,13 +165,14 @@ const TR = SITE.trainer.pos;
 const ROUTE: Stop[][] = [
   [
     // 0 — inside the hangar at dawn, looking out past the aircraft
-    [0, [-6.5, 2.3, 44], [1.5, 3.1, -40], 0.13, 1.0],
-    [0.5, [-5.2, 2.6, 33], [1, 3, -40], 0.13, 1.0],
-    [0.78, [-1.5, 3.6, 13], [0, 2.4, -10], 0.04],
+    [0, [-6.5, 2.3, 44], [1.5, 3.1, -40], 0.13, 1.0, 0.25],
+    [0.5, [-5.2, 2.6, 33], [1, 3, -40], 0.13, 1.0, 0.25],
+    [0.78, [-1.5, 3.6, 13], [0, 2.4, -10], 0.04, 1.3, 0.2],
     [0.9, [15, 6, -15], [0, 2.4, -4], 0],
     // 1 — out front, the two signs either side of the nose
-    [1.0, [0.5, 2.1, -38], [0, 4.6, -4], 0, 1.25],
-    [1.4, [0.2, 2.0, -39.5], [0, 4.7, -4], 0, 1.25],
+    // a phone frame is narrow: the camera stands well back so both taxi signs fit whole
+    [1.0, [0.5, 2.1, -38], [0, 4.6, -4], 0, 1.65],
+    [1.4, [0.2, 2.0, -39.5], [0, 4.7, -4], 0, 1.65],
     [1.56, [19, 2.3, -40], [0, 2, -26], 0],
     rel(1.7, [21, -0.5, -13], [0, 0.2, -3], 0.05),
     rel(1.84, [23, 0.8, -17], [0, 0.4, -2], 0.12),
@@ -197,8 +207,10 @@ const ROUTE: Stop[][] = [
     [7.9, [-8, 6, -214], [16, 6, -160], 0],
     // 8 — the campus, laid out across the frame
     // from higher up, so the campus sits in the upper half and the runway below it carries the copy
-    [8.0, [-75, 30, -130], [42, -12.5, -134], 0, 1.5],
-    [8.62, [-70, 27.5, -146], [42, -12, -133], 0, 1.5],
+    // aimed only a little below the apron: steeper than this and the tower
+    // and the parked aircraft leave the top of the frame
+    [8.0, [-66, 23, -126], [42, -2.5, -133], 0, 1.5],
+    [8.62, [-62, 21, -144], [42, -2, -132], 0, 1.5],
     [8.86, [8, 6, -112], [TR.x, 2, TR.z], 0.1],
     // 9 — walk-round: nose, wing, tail
     [9.0, [TR.x - 20, 1.9, TR.z - 16], [TR.x - 2.5, 4.4, TR.z - 2], 0.18],
@@ -222,6 +234,8 @@ const cameraLegs = ROUTE.map((stops) => new Leg(stops, [curve(stops.map((s) => s
 export interface Shot {
   shift: number;
   pullback: number;
+  /** Portrait only: how far up the frame the subject sits, 0…1 of the height. */
+  lift: number;
 }
 export function sampleCamera(t: number, pos: THREE.Vector3, look: THREE.Vector3, shot: Shot): Shot {
   const leg = cameraLegs.find((l) => t <= l.t1) ?? cameraLegs[cameraLegs.length - 1];
@@ -230,7 +244,41 @@ export function sampleCamera(t: number, pos: THREE.Vector3, look: THREE.Vector3,
   leg.curves[1].getPoint(u, look);
   const a = leg.keys[j], b = leg.keys[j + 1];
   shot.shift = a[3] + (b[3] - a[3]) * s;
-  shot.pullback = (a[4] ?? 1.3) + ((b[4] ?? 1.3) - (a[4] ?? 1.3)) * s;
+  const pa = a[4] ?? 1.3, pb = b[4] ?? 1.3;
+  shot.pullback = pa + (pb - pa) * s;
+  const la = liftFor(pa, a[5]), lb = liftFor(pb, b[5]);
+  shot.lift = la + (lb - la) * s;
+  return shot;
+}
+
+/** Lowest the lens may go: eye height over whatever is beneath it. */
+export const CAMERA_CLEARANCE = 1.15;
+
+/**
+ * Where the camera is for a given moment and screen shape. Tall screens pull
+ * the camera back along its sightline so the subject still fits; wide-ish
+ * ones a little. Whatever the shape, the lens never ends up underground —
+ * pulling back along a line that looks up at something means pulling down.
+ */
+export function frameCamera(t: number, aspect: number, portrait: boolean, pos: THREE.Vector3, look: THREE.Vector3, shot: Shot): Shot {
+  sampleCamera(t, pos, look, shot);
+  if (portrait) {
+    // Step back, do not sink. Scaling the whole offset drags a low camera down
+    // through the ground on shots that look upward; a photographer backing up
+    // keeps their eye height, so the vertical part of the move is damped.
+    const k = shot.pullback;
+    pos.set(
+      look.x + (pos.x - look.x) * k,
+      look.y + (pos.y - look.y) * (1 + (k - 1) * 0.35),
+      look.z + (pos.z - look.z) * k,
+    );
+  }
+  else {
+    const narrow = THREE.MathUtils.clamp((1.55 - aspect) / 0.55, 0, 1);
+    if (narrow > 0) pos.sub(look).multiplyScalar(1 + narrow * 0.32).add(look);
+  }
+  const floor = groundHeight(pos.x, pos.z) + CAMERA_CLEARANCE;
+  if (pos.y < floor) pos.y = floor;
   return shot;
 }
 
@@ -252,17 +300,17 @@ interface GradeDef {
 // afternoon at the academy, sunset on the last runway, night over the forms.
 // Zeniths stay deep and horizons mid-toned so light copy reads against the sky.
 const GRADES: GradeDef[] = [
-  { t: 0, top: '#061730', horizon: '#cc8048', sunColor: '#ffb47c', sun: [0.1, 0.07, -1], key: 3.2, hemi: 0.3, fog: 0.0032, stars: 0.35, exposure: 0.98 },
+  { t: 0, top: '#0a2142', horizon: '#cc8048', sunColor: '#ffb47c', sun: [0.1, 0.07, -1], key: 3.2, hemi: 0.3, fog: 0.0026, stars: 0.35, exposure: 0.98 },
   { t: 1, top: '#0a2850', horizon: '#b08a68', sunColor: '#ffd2a4', sun: [0.25, 0.2, -1], key: 3.4, hemi: 0.5, fog: 0.0028, stars: 0, exposure: 0.95 },
-  { t: 2, top: '#0a2f5e', horizon: '#6b8ca6', sunColor: '#fff0d8', sun: [0.6, 0.5, -0.5], key: 3.6, hemi: 0.6, fog: 0.0022, stars: 0, exposure: 0.92 },
-  { t: 3, top: '#0a2f5e', horizon: '#5f88aa', sunColor: '#fff6e6', sun: [-0.3, 0.8, -0.4], key: 3.8, hemi: 0.62, fog: 0.0022, stars: 0, exposure: 0.92 },
-  { t: 4, top: '#0a2e5c', horizon: '#6789a4', sunColor: '#fff4e0', sun: [0.6, 0.62, 0.5], key: 3.8, hemi: 0.6, fog: 0.0022, stars: 0, exposure: 0.92 },
+  { t: 2, top: '#0a2f5e', horizon: '#6b8ca6', sunColor: '#fff0d8', sun: [0.6, 0.5, -0.5], key: 3.6, hemi: 0.6, fog: 0.0015, stars: 0, exposure: 0.92 },
+  { t: 3, top: '#0a2f5e', horizon: '#5f88aa', sunColor: '#fff6e6', sun: [-0.3, 0.8, -0.4], key: 3.8, hemi: 0.62, fog: 0.0013, stars: 0, exposure: 0.92 },
+  { t: 4, top: '#0a2e5c', horizon: '#6789a4', sunColor: '#fff4e0', sun: [0.6, 0.62, 0.5], key: 3.8, hemi: 0.6, fog: 0.0014, stars: 0, exposure: 0.92 },
   { t: 5, top: '#0a2a52', horizon: '#5b7d98', sunColor: '#ffefd4', sun: [-0.55, 0.5, 0.5], key: 3.3, hemi: 0.5, fog: 0.0016, stars: 0, exposure: 0.9 },
-  { t: 6, top: '#0a2850', horizon: '#74889a', sunColor: '#ffe7c4', sun: [-0.6, 0.4, 0.55], key: 3.5, hemi: 0.54, fog: 0.0022, stars: 0, exposure: 0.92 },
-  { t: 7, top: '#0a2448', horizon: '#8f8a86', sunColor: '#ffdcae', sun: [0.5, 0.26, 0.6], key: 3.5, hemi: 0.5, fog: 0.0023, stars: 0, exposure: 0.92 },
-  { t: 8, top: '#092040', horizon: '#b08460', sunColor: '#ffc98f', sun: [-0.8, 0.17, 0.3], key: 3.4, hemi: 0.44, fog: 0.0024, stars: 0, exposure: 0.94 },
-  { t: 9, top: '#081a36', horizon: '#c67a48', sunColor: '#ffb074', sun: [-0.62, 0.1, -0.7], key: 3.0, hemi: 0.38, fog: 0.0026, stars: 0.1, exposure: 0.96 },
-  { t: 10.0, top: '#050f22', horizon: '#c0623a', sunColor: '#ff9050', sun: [0.02, 0.035, -1], key: 2.3, hemi: 0.3, fog: 0.003, stars: 0.5, exposure: 1.0 },
+  { t: 6, top: '#0a2850', horizon: '#74889a', sunColor: '#ffe7c4', sun: [-0.6, 0.4, 0.55], key: 3.5, hemi: 0.54, fog: 0.0015, stars: 0, exposure: 0.92 },
+  { t: 7, top: '#0a2448', horizon: '#8f8a86', sunColor: '#ffdcae', sun: [0.5, 0.26, 0.6], key: 3.5, hemi: 0.5, fog: 0.0016, stars: 0, exposure: 0.92 },
+  { t: 8, top: '#0b2850', horizon: '#b48a66', sunColor: '#ffc98f', sun: [-0.8, 0.17, 0.3], key: 3.4, hemi: 0.44, fog: 0.0016, stars: 0, exposure: 0.94 },
+  { t: 9, top: '#0c2a55', horizon: '#c98552', sunColor: '#ffb074', sun: [-0.62, 0.1, -0.7], key: 3.0, hemi: 0.38, fog: 0.0018, stars: 0.1, exposure: 0.96 },
+  { t: 10.0, top: '#0a1c3c', horizon: '#c86a3e', sunColor: '#ff9050', sun: [0.02, 0.035, -1], key: 2.3, hemi: 0.3, fog: 0.0022, stars: 0.5, exposure: 1.0 },
   { t: 10.35, top: '#030916', horizon: '#6a3320', sunColor: '#ff8448', sun: [0.02, 0.01, -1], key: 1.0, hemi: 0.2, fog: 0.0032, stars: 0.9, exposure: 1.0 },
   { t: 10.65, top: '#02040a', horizon: '#150c0c', sunColor: '#8fa6d6', sun: [0.2, 0.5, -0.6], key: 0.35, hemi: 0.1, fog: 0.0034, stars: 1, exposure: 1.0 },
   { t: 11.0, top: '#02040a', horizon: '#0d0909', sunColor: '#8fa6d6', sun: [0.2, 0.5, -0.6], key: 0.3, hemi: 0.1, fog: 0.0034, stars: 1, exposure: 1.0 },

@@ -10,6 +10,22 @@ import type {
 } from './schema';
 
 const SNAPSHOT = '2026-11-16';
+/** Second pass: the operator's own site read directly, page by page. */
+const SCRAPE = '2026-11-19';
+const fromOperator = (page: string, owner: string, note?: string): Verification => ({
+  source: `abyssinianflights.com \u2014 ${page}, read ${SCRAPE}`,
+  owner,
+  status: 'needs-client-approval',
+  lastVerifiedAt: null,
+  note,
+});
+/** A superlative or a figure the operator reports about itself is not evidence. */
+const selfReported = (page: string, owner: string, note: string): Verification => ({
+  ...fromOperator(page, owner, note),
+  status: 'unverified-claim',
+});
+const AFS_LEAD = 'AFS commercial lead (to be named)';
+const AFS_AM = 'AFS/AAA accountable manager (to be named)';
 
 const fromFlightSite = (note?: string): Verification => ({
   source: `abyssinianflights.com public site, research snapshot ${SNAPSHOT}`,
@@ -170,8 +186,14 @@ export const proof: ProofItem[] = [
   {
     id: 'aircraft',
     title: { en: 'Training aircraft' },
-    body: { en: 'Single- and multi-engine flying is part of the programme list. Ask admissions which aircraft you would train on.' },
-    verification: fromAcademySite('Fleet types and numbers not approved — none stated.'),
+    body: {
+      en: 'The operator flies the Cessna Grand Caravan on its charter, cargo and air-ambulance work. Single- and multi-engine flying is part of the programme list \u2014 ask admissions which aircraft you would train on.',
+    },
+    verification: fromOperator(
+      'Air Ambulance (page 2310) and Flight Hub (page 2190)',
+      AFS_LEAD,
+      'Grand Caravan named by the operator. Fleet count, registrations and which types are used for training are not published and are not stated here.',
+    ),
   },
   {
     id: 'simulator',
@@ -203,46 +225,68 @@ export const proof: ProofItem[] = [
 export const claims: Claim[] = [
   {
     id: 'first-private-academy',
-    statement: 'The First Private Aviation Academy in Ethiopia',
-    verification: {
-      source: `abyssiniaaviationacademy.com positioning line, ${SNAPSHOT}`,
-      owner: 'AAA managing director (to be named)',
-      status: 'unverified-claim',
-      lastVerifiedAt: null,
-      note: 'Requires evidence and approved wording before publication. Not rendered.',
-    },
+    statement: 'In 2007 AFS launched Abyssinian Pilot Training School, Ethiopia\u2019s first private pilot training school, later an Approved Training Organization and full Aviation Academy',
+    verification: selfReported(
+      'Flight Hub / About (page 2190)',
+      'AAA managing director (to be named)',
+      'The operator\u2019s own wording, with a date and the original school name \u2014 more specific than the bare first private aviation academy line. Still a self-reported first: needs evidence and approved wording before publication.',
+    ),
   },
   {
     id: 'since-1999',
-    statement: 'Since 1999 (logo lock-up) / 25th-year anniversary graduation banner',
-    verification: {
-      source: `Logo and pop-up banner in supplied screenshots, ${SNAPSHOT}`,
-      owner: 'AFS/AAA managing director (to be named)',
-      status: 'unverified-claim',
-      lastVerifiedAt: null,
-      note: 'Founding year not confirmed. Not rendered.',
-    },
+    statement: 'Established in 1999; 25 years marked on 17 November 2024',
+    verification: fromOperator(
+      'Flight Hub / About (page 2190) and the 25-year anniversary post (11 Dec 2024)',
+      AFS_AM,
+      'Two places on the operator\u2019s own site agree, and the anniversary date is consistent with 1999. Publishable once the client confirms the founding date.',
+    ),
   },
   {
-    id: 'academy-stat-band',
-    statement: 'Numeric statistics band on the academy home page',
-    verification: {
-      source: `Academy home page screenshot, ${SNAPSHOT}`,
-      owner: 'AAA head of training (to be named)',
-      status: 'unverified-claim',
-      lastVerifiedAt: null,
-      note: 'Figures have no stated source. Not migrated.',
-    },
+    id: 'air-operator-certificate',
+    statement: 'Private air charter operator holding an Air Operator Certificate from the Ethiopian Civil Aviation Authority, for international and domestic non-scheduled commercial air transport',
+    verification: fromOperator('Flight Hub / About (page 2190)', AFS_AM, 'Rendered in the trust chapter. Certificate number and validity still needed.'),
+  },
+  {
+    id: 'ato-status',
+    statement: 'Approved Training Organization (ATO) status for the Aviation Academy',
+    verification: fromOperator('Flight Hub / About (page 2190)', 'AAA head of training (to be named)', 'Rendered in the trust chapter. Approval reference and scope still needed.'),
+  },
+  {
+    id: 'over-50-destinations',
+    statement: 'Explore over 50 destinations with Abyssinian Flight Services',
+    verification: selfReported(
+      'Destinations (page 2010)',
+      AFS_LEAD,
+      'The site names nine destinations but claims over fifty. Not rendered: the destination chapter shows only the nine that are named.',
+    ),
   },
   {
     id: 'gerd-guba-charter',
-    statement: 'GERD / Guba charter content',
-    verification: fromFlightSite('Present on current site; route status unknown. Not rendered as a destination.'),
+    statement: 'Specialised charter flights to Guba for the GERD from 25 September 2025: about 1h45\u20132h each way and a five-hour guided tour; five flights flown at the time of writing',
+    verification: fromOperator(
+      'GERD tours post (20 Nov 2025)',
+      AFS_LEAD,
+      'Dated and specific. A candidate for a destination or news entry once the client confirms it still runs and the flight count is current.',
+    ),
   },
   {
     id: 'aerial-survey',
-    statement: 'Aerial survey & photography service',
-    verification: fromFlightSite('Present in current navigation but outside the brief’s three mission chapters. Awaiting decision.'),
+    statement: 'Aerial Survey & Photography \u2014 a fourth published service, for identifying minerals, vegetation and wildlife for investors and agriculture',
+    verification: fromOperator(
+      'Aerial Survey & Photography (page 2324)',
+      AFS_LEAD,
+      'A full service page on the operator\u2019s site that this build does not yet cover. Awaiting a decision on whether it becomes a fourth mission chapter.',
+    ),
+  },
+  {
+    id: 'recognitions',
+    statement: 'Certificates of recognition from the Ethiopian Public Health Institute (2025\u201326 Marburg response) and the Addis Ababa No. 2 Medium Taxpayers Branch Office (2024/25 tax compliance)',
+    verification: fromOperator('News posts (16 Feb 2026)', AFS_AM, 'Third-party recognitions with dates. Not rendered: awaiting a decision on a news or recognition section.'),
+  },
+  {
+    id: 'motto-and-vision',
+    statement: 'Motto Integrity Is Our Hallmark; vision to be a competitive general aviation service provider in East Africa by 2030',
+    verification: fromOperator('Tax compliance post and Five-Year Strategic Plan post (2026)', AFS_AM, 'Not rendered. Useful if the client wants their own words in the trust chapter.'),
   },
 ];
 
@@ -293,9 +337,9 @@ export const contact: ContactDetail[] = [
   },
   {
     id: 'address',
-    label: 'Address',
-    value: 'Bole, in front of Yougo City Church, Addis Ababa',
-    verification: fromFlightSite('Transcribed from current footer (“infront of Yougo city church … 7716”). Confirm exact wording and P.O. box.'),
+    label: 'Office',
+    value: 'Cameron Street, Bole, Addis Ababa 7716',
+    verification: fromOperator('Contact Us (page 2229) \u2014 Business Physical Address', AFS_LEAD, 'The site gives a separate billing address: Bole, in front of Yougo City Church, Addis Ababa 7716.'),
   },
   {
     id: 'hours',
@@ -324,14 +368,14 @@ export const trust: ProofItem[] = [
   {
     id: 'approvals',
     title: { en: 'Approvals, on paper' },
-    body: { en: 'Ask to see our current operating approvals and training authorisations. We would rather show you the documents than a badge.' },
-    verification: {
-      source: 'New copy written for this build',
-      owner: 'AFS/AAA accountable manager (to be named)',
-      status: 'needs-client-approval',
-      lastVerifiedAt: null,
-      note: 'Replace with named regulator approvals and certificate references once supplied.',
+    body: {
+      en: 'We hold an Air Operator Certificate from the Ethiopian Civil Aviation Authority, and the academy is an Approved Training Organization. Ask to see the certificates \u2014 we would rather show you the documents than a badge.',
     },
+    verification: fromOperator(
+      'Flight Hub / About (page 2190)',
+      AFS_AM,
+      'Operator states both approvals on its own site. Certificate numbers, holder name and validity dates still to be supplied before launch.',
+    ),
   },
   {
     id: 'facts',

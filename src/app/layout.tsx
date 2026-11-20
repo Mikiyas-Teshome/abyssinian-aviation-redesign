@@ -35,9 +35,31 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-// Runs before first paint: marks JS as available, skips the loader on repeat
-// views, and guarantees reveal-hidden content appears even if the app bundle fails.
-const boot = `(function(){var d=document.documentElement;d.classList.add('js');try{if(sessionStorage.getItem('aby-seen'))d.classList.add('seen')}catch(e){}setTimeout(function(){if(!window.__motionReady)d.classList.add('reveal-all')},4000)})()`;
+// Runs before first paint, so nothing it decides can flash.
+//  · marks JS as available, and locks scrolling until the world is ready —
+//    there is nothing to see behind the cover, and scrolling past it means
+//    arriving somewhere with the chapter already half over;
+//  · stops the browser restoring a scroll position, because the page is one
+//    screen tall before it hydrates and many screens tall afterwards, so a
+//    restored position lands somewhere else entirely, mid-flight;
+//  · marks a reload, which skips the intro entirely. `navigation.type` is how
+//    a reload is told apart from arriving at the page, which storage cannot
+//    do: a refresh keeps the same tab, the same origin and the same storage.
+//
+// All of it goes in attributes, never in `class`. React owns this element's
+// className and restores the server's value when it hydrates, which silently
+// threw away everything decided here — including the flag that says a reload
+// needs no intro, and so the one that releases the scroll lock.
+//
+// The fallback deadline sits past the cover's own (9s), so the cover always
+// gets to leave under its own power and unbind its scroll lock; this is only
+// for the case where the bundle never runs at all.
+const boot = `(function(){var d=document.documentElement;d.setAttribute('data-js','');
+if('scrollRestoration' in history&&!location.hash)history.scrollRestoration='manual';
+var seen=false;try{var n=performance.getEntriesByType('navigation')[0];seen=!!(n&&n.type!=='navigate')}catch(e){}
+if(seen)d.setAttribute('data-seen','');d.setAttribute('data-hold','');
+setTimeout(function(){if(!d.hasAttribute('data-entered'))d.setAttribute('data-boot-timeout','');
+d.setAttribute('data-entered','');d.removeAttribute('data-hold')},12000)})()`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

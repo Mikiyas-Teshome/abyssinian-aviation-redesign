@@ -4,15 +4,20 @@ import { useEffect } from 'react';
 import { proof, trust } from '@/content/site';
 import { scrollToProgress } from '@/animation/ScrollRig';
 import { stage } from '@/animation/stage';
-import { useActStep, useImmersive } from '@/animation/useAct';
+import { useActProgress, useActStep, useImmersive } from '@/animation/useAct';
 
 const ENV_BOUNDS = [0.125, 0.25, 0.375, 0.5];
 const TRUST_BOUNDS = [0.2, 0.4];
+/** The note takes this much of the act to arrive; the labels wait for it. */
+const AFTER_NOTE = 0.07;
 
 /** Training environment: five things to see, each pinned to its building on the campus. */
 export function Campus() {
   const step = useActStep('environment', ENV_BOUNDS);
   const immersive = useImmersive();
+  // One label at a time, and not until the note has finished arriving: five
+  // of them sliding about while the text fades in is just noise.
+  const marked = useActProgress('environment') > AFTER_NOTE ? step : -1;
   useEffect(() => stage.refreshAnchors?.(), [immersive]);
 
   return (
@@ -43,7 +48,13 @@ export function Campus() {
       </div>
       <div className="marks" aria-hidden="true">
         {proof.map((item, i) => (
-          <span key={item.id} className="mark" data-anchor={`env:${item.id}`} data-on={i === step}>
+          <span
+            key={item.id}
+            className="mark"
+            data-anchor={`env:${item.id}`}
+            data-on={i === marked}
+            {...(i === marked ? {} : { 'data-anchor-hidden': '' })}
+          >
             <b>{String(i + 1).padStart(2, '0')}</b> {item.title.en}
           </span>
         ))}
@@ -56,6 +67,7 @@ export function Campus() {
 export function WalkRound() {
   const step = useActStep('trust', TRUST_BOUNDS);
   const immersive = useImmersive();
+  const marked = useActProgress('trust') > AFTER_NOTE ? step : -1;
   useEffect(() => stage.refreshAnchors?.(), [immersive]);
 
   return (
@@ -78,7 +90,14 @@ export function WalkRound() {
       </div>
       <div className="marks" aria-hidden="true">
         {trust.map((item, i) => (
-          <span key={item.id} className="mark mark--dot" data-anchor={`trust:${i}`} data-anchor-origin="center" data-on={i === step}>
+          <span
+            key={item.id}
+            className="mark mark--dot"
+            data-anchor={`trust:${i}`}
+            data-anchor-origin="center"
+            data-on={i === marked}
+            {...(i === marked ? {} : { 'data-anchor-hidden': '' })}
+          >
             <b>{String(i + 1).padStart(2, '0')}</b>
           </span>
         ))}

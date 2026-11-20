@@ -175,9 +175,10 @@ export default function Home() {
                   <span className="ln"><span>Ready when</span></span>
                   <span className="ln"><span><i>you are.</i></span></span>
                 </h2>
-                <p className="lede" data-in>
-                  Prefer to talk? Call <a href={office.href}>{office.value}</a>.
-                </p>
+                <div className="enquire__call" data-in>
+                  <p className="lede">Prefer to talk?</p>
+                  <a className="btn btn--line" href={office.href}>Call {office.value}</a>
+                </div>
               </header>
               <EnquiryPanel />
               <noscript>
